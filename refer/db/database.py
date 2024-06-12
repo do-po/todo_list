@@ -7,7 +7,7 @@ class MyDB:
     def __init__(
             self,
             _host = os._host,
-            _port = os._port,
+            _port = int(os._port),
             _user = os._user,
             _pw = os._pw,
             _db = os._db

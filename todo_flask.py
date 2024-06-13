@@ -1,17 +1,25 @@
 
 # 필요한 라이브러리 로드
 import pandas as pd
-from flask import Flask, render_template, request, redirect
+from flask import Flask, render_template, request, redirect, session
+from datetime import timedelta
 
 # 함수가 저장된 모듈 로드
 from refer.module import func
 from refer.module.database import MyDB
+
 
 # SQL 연결을 위한 MyDB 클래스 생성
 db = MyDB()
 
 # Flask로 서버 구축
 app = Flask(__name__)
+
+# secret_key 설정 (session data 암호화 키)
+app.secret_key = 'ABC'
+
+# 세션 데이터의 생명주기(지속시간)을 설정 **이거 시간이 아니라 종료시로 바꿔야 해
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(minutes= 15)
 
 
 # 로그인을 위해 post로 보내진 회원 가입 데이터 가져오기

@@ -2,15 +2,17 @@ import pymysql
 from dotenv import load_dotenv
 import os
 
+load_dotenv()
+
 class MyDB:
     # 생성자 함수 생성 (DB 서버의 정보를 입력)
     def __init__(
             self,
-            _host = os._host,
-            _port = int(os._port),
-            _user = os._user,
-            _pw = os._pw,
-            _db = os._db
+            _host = os.getenv('_host'),
+            _port = int(os.getenv('_port')),
+            _user = os.getenv('_user'),
+            _pw = os.getenv('_pw'),
+            _db = os.getenv('_db')
     ):
         self.host = _host
         self.port = _port

@@ -53,7 +53,7 @@ def sign_up():
                                         # ** 앞으로 여기 파트에 session, 로그인 실패시 정보를 보여주기 위해 데이터 담아주기 필요 <- 이게 무슨 말이었더라....??
     # 로그인 성공시 /home으로 이동
     if result:
-        return redirect('/home')
+        return render_template('/home.html')
     
     # 로그인 실패시 /sign_up으로 다시 이동
     else:

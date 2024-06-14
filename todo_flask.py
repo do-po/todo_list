@@ -21,6 +21,17 @@ app.secret_key = 'ABC'
 # 세션 데이터의 생명주기(지속시간)을 설정 **이거 시간이 아니라 종료시로 바꿔야 해 (세션 종료시 스케쥴 업데이트 위해서)
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(minutes= 15)
 
+@app.route('/session_true')
+def session_true():
+    
+    # 세션에 데이터가 존재한다면 home.html 되돌려준다
+    if 'user_id' in session:
+        return render_template('/home.html')
+
+    # 세션에 데이터가 존재하지 않는다면 login 화면 되돌려준다
+    else:
+        return redirect('/sign_up')
+
 # 로그인 페이지
     # 로그인을 위해 post로 보내진 회원 가입 데이터 가져오기
 @app.route('/sign_up', methods=['post'])

@@ -1,79 +1,131 @@
-# 필요 라이브러리 로드
-from database import MyDB
+import pandas as pd
+from refer.module.database import MyDB
 from dotenv import load_dotenv
 import os
 
 # MyDB 클래스 생성
-
 db = MyDB()
 
-# DB에 저장하는 기능을 모아둔 섹션
-    
-    # 테이블에 데이터를 저장
-def save_data(_data:dict, _table):
+# 테이블에 데이터를 저장하는 함수
+def save_data(data, table):
+    """
+    다양한 형식의 데이터를 받아서 테이블에 저장하는 함수
+    data: dict, DataFrame 또는 list 중 하나
+    table: 데이터를 저장할 테이블 이름
+    """
+    if isinstance(data, dict):
+        save_dict_data(data, table)  # dict 형식의 데이터를 처리하는 함수 호출
+    elif isinstance(data, pd.DataFrame):
+        save_dataframe_data(data, table)  # DataFrame 형식의 데이터를 처리하는 함수 호출
+    elif isinstance(data, list):
+        save_list_data(data, table)  # list 형식의 데이터를 처리하는 함수 호출
+    else:
+        raise ValueError("Unsupported data type. Please provide a dict, DataFrame, or list.")  # 지원하지 않는 데이터 타입 처리
 
-    # sql 쿼리 작성
+def save_dict_data(data, table):
+    """
+    dict 형식의 데이터를 테이블에 저장하는 함수
+    data: dict 형태의 데이터
+    table: 데이터를 저장할 테이블 이름
+    """
+    # 특정 테이블(user_weight)에서만 user_id 제거
+    if (table == 'user_weight') & ('user_id' in data):
+        
+        del data['user_id']
     query = f'''
-    INSERT
-    INTO
-    `{_table}`
-    ({','.join(tuple(_data.keys()))})
+    INSERT INTO `{table}`
+    ({','.join(tuple(data.keys()))})
     VALUES
-    ({','.join(tuple(_data.values()))})
+    ({','.join(['%s'] * len(data))})
     '''
-    print(query)
-    # MyDB 모듈로 query 실행
-    result = db.sql_query(query)
-    
+    print("sql query : ", query)  # 생성된 쿼리 출력 (디버깅 용도)
+    print("sql insert data : ", data)   # 데이터 출력 (디버깅 용도)
+    result = db.sql_query(query, *list(data.values()))  # MyDB 모듈을 통해 쿼리 실행
     return result
 
-# DB에서 데이터를 받아오는 기능들을 모아둔 섹션
+def save_list_data(data, table):
+    """
+    list 형식의 데이터를 테이블에 저장하는 함수
+    data: list 형태의 데이터 (각 요소가 dict 형태)
+    table: 데이터를 저장할 테이블 이름
+    """
+    for index, record in enumerate(data):
+        # 특정 테이블(user_weight)에서만 user_id 제거
+        if (table == 'user_weight') and ('user_id' in record):
+            del record['user_id']
+        try:
+            print("save_list_data record : ",type(record))
+            save_dict_data(record, table)  # 각 dict 데이터를 저장하는 함수 호출
+        except Exception as e:
+            print(f"Error inserting record {index}: {e}")
 
-    # 유저의 속성에 맞는 가중치를 SQL에서 받아온다
-def get_data(_user:dict, _table = 'base_weight'):
+def save_dataframe_data(dataframe, table):
+    """
+    DataFrame 형식의 데이터를 테이블에 저장하는 함수
+    dataframe: DataFrame 형태의 데이터
+    table: 데이터를 저장할 테이블 이름
+    """
+    for index, row in dataframe.iterrows():  # DataFrame의 각 행을 반복
+        data_dict = row.to_dict()  # 각 행을 딕셔너리로 변환
+        # 특정 테이블(user_weight)에서만 user_id 제거
+        if table == 'user_weight' and 'user_id' in data_dict:
+            del data_dict['user_id']
+        try:
+            save_dict_data(data_dict, table)  # 변환된 딕셔너리 데이터를 저장하는 함수 호출
+        except Exception as e:
+            print(f"Error inserting row {index}: {e}")
 
-    # 빈 리스트를 생성하여 조건문을 저장
-    condition_list = []
-
-    # _user의 각 key에 대해 반복
-    for key in _user.keys():
-        
-        # 각 key에 대해 'key = %s' 형식의 문자열을 생성하여 리스트에 추가
-        condition = f'{key} = %s'
-        condition_list.append(condition)
-
-    # 리스트의 모든 문자열을 " AND "로 연결하여 query 생성
-    conditions = " AND ".join(condition_list)
-
-    # sql 쿼리 실행
-    query = f'''
-    SELECT
-    {','.join(_user.keys())}
-    FROM
-    `{_table}`
-    WHERE
-    {conditions}
-    '''
-
-    # MyDB 모듈로 query 실행
-    result = db.sql_query(query, *list(_user.values()))
-
-    # 가중치를 저장할 dict와 list 생성
-    data = {}
-    weights = []
-
-    # query 결과를 가중치 list에 저장
-    weights.append(result)
-
-        # query 결과를 처리
-    if result:  # 결과가 존재하면
-        # 첫 번째 행의 결과만 사용, _user의 각 키에 대응하는 값을 저장
-        first_result = result[0]
-        for key in _user.keys():
-            data[key] = first_result[key]
+# 유저의 속성에 맞는 가중치를 SQL에서 받아오는 함수
+def get_data(user, table='base_weight'):
+    """
+    다양한 형식의 유저 데이터를 받아서 해당 유저의 속성에 맞는 가중치를 SQL에서 받아오는 함수
+    user: dict 또는 DataFrame 중 하나
+    table: 데이터를 조회할 테이블 이름 (기본값: 'base_weight')
+    """
+    if isinstance(user, dict):
+        return get_dict_data(user, table)  # dict 형식의 유저 데이터를 처리하는 함수 호출
+    elif isinstance(user, pd.DataFrame):
+        return get_dataframe_data(user, table)  # DataFrame 형식의 유저 데이터를 처리하는 함수 호출
     else:
-        # 결과가 없는 경우, 기본값 또는 오류 처리를 할 수 있음
-        print("No data found matching the criteria.")
+        raise ValueError("Unsupported user data type. Please provide a dict or a DataFrame.")  # 지원하지 않는 데이터 타입 처리
 
-    # 만들어진 가중치 dict를 반환
-    return data
+def get_dict_data(user, table):
+    """
+    dict 형식의 유저 데이터를 받아서 해당 유저의 속성에 맞는 가중치를 SQL에서 받아오는 함수
+    user: dict 형태의 유저 데이터
+    table: 데이터를 조회할 테이블 이름
+    """
+    condition_list = [f'{key} = %s' for key in user.keys()]  # 조건문 리스트 생성
+    conditions = " AND ".join(condition_list)  # 조건문 리스트를 " AND "로 연결하여 쿼리 생성
+    query = f'''
+    SELECT * FROM `{table}`
+    WHERE {conditions}
+    '''
+    result = db.sql_query(query, *list(user.values()))  # MyDB 모듈을 통해 쿼리 실행
+    return format_result(result)  # 결과 형식화 함수 호출
+
+def get_dataframe_data(dataframe, table):
+    """
+    DataFrame 형식의 유저 데이터를 받아서 해당 유저의 속성에 맞는 가중치를 SQL에서 받아오는 함수
+    dataframe: DataFrame 형태의 유저 데이터
+    table: 데이터를 조회할 테이블 이름
+    """
+    results = []
+    for index, row in dataframe.iterrows():  # DataFrame의 각 행을 반복
+        user_dict = row.to_dict()  # 각 행을 딕셔너리로 변환
+        results.append(get_dict_data(user_dict, table))  # 변환된 딕셔너리 데이터를 처리하여 결과 리스트에 추가
+    return results  # 결과 리스트 반환
+
+def format_result(result):
+    """
+    쿼리 결과를 형식화하는 함수
+    result: 쿼리 결과
+    """
+    if not result:
+        print("No data found matching the criteria.")  # 결과가 없으면 메시지 출력
+        return {}
+    data = {}
+    first_result = result[0]
+    for key in first_result.keys():
+        data[key] = first_result[key]
+    return data  # 형식

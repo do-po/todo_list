@@ -26,8 +26,8 @@ debug_message("기존 모델과 데이터 로드 완료")
 
 # 초기 y 값 설정 및 결합
 debug_message("초기 y 값 설정 및 결합 중...")
-y_df_1 = schedule_1[['base_weight_no']].merge(base_weight, left_on='base_weight_no', right_on='no')[['work', 'edu', 'free_time', 'health', 'chores']]
-y_df_2 = schedule_2[['user_weight_no']].merge(user_weight, on='user_weight_no')[['work', 'edu', 'free_time', 'health', 'chores']]
+y_df_1 = schedule_1[['base_weight_no']].merge(base_weight, left_on='base_weight_no', right_on='no')[['work', 'edu', 'free_time', 'health', 'chores', 'category_else']]
+y_df_2 = schedule_2[['user_weight_no']].merge(user_weight, on='user_weight_no')[['work', 'edu', 'free_time', 'health', 'chores', 'category_else']]
 debug_message("초기 y 값 설정 및 결합 완료")
 
 # X 및 y 결합

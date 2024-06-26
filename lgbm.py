@@ -38,7 +38,7 @@ debug_message(f"schedule_2 열 이름: {schedule_2.columns}")
 debug_message("y 값 설정 중...")
 y_df = schedule_2[['user_weight_no']].merge(
     user_weight, on='user_weight_no'
-)[['work', 'edu', 'free_time', 'health', 'chores']]
+)[['work', 'edu', 'free_time', 'health', 'chores', 'category_else']]
 debug_message("y 값 설정 완료")
 
 # 3. 데이터 분할

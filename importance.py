@@ -35,7 +35,7 @@ encoded_data = encoder.fit_transform(data[['gender', 'job', 'mbti']]).toarray()
 debug_message("범주형 데이터 원-핫 인코딩 완료")
 
 # 인코딩된 데이터와 수치형 데이터를 결합
-numeric_data = data[['age', 'work', 'edu', 'free_time', 'health', 'chores']].values
+numeric_data = data[['age', 'work', 'edu', 'free_time', 'health', 'chores', 'category_else']].values
 X = np.hstack((encoded_data, numeric_data))
 
 # 데이터 정규화
@@ -62,14 +62,14 @@ hidden_layer2_size = 64   # 두 번째 은닉층의 노드 수 결정: 모델의
 # TensorFlow/Keras를 사용하여 신경망 모델 정의
 debug_message("신경망 모델 정의 중...")
 model = Sequential()
-model.add(Dense(hidden_layer1_size, input_dim=X_train.shape[1], activation='relu'))  # ReLU 활성화 함수 사용: sigmoid, tanh, leakyrelu 얘기 해야지
+model.add(Dense(hidden_layer1_size, input_dim=X_train.shape[1], activation='relu'))
 model.add(Dense(hidden_layer2_size, activation='relu'))
 model.add(Dense(y_train.shape[1])) # 출력 레이어는 1개
 debug_message("신경망 모델 정의 완료")
 
 # 모델 컴파일
 debug_message("모델 컴파일 중...")
-model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), loss='mse')  # Adam 옵티마이저 사용: NAG 사용하는 NAdam, Momentum 사용하는 Adam 중 Adam 사용
+model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), loss='mse')
 debug_message("모델 컴파일 완료")
 
 # 모델 학습

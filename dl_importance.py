@@ -4,7 +4,7 @@ import tensorflow as tf
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense, Dropout, BatchNormalization
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from sklearn.metrics import mean_squared_error
 import ray
 from ray import tune
@@ -13,8 +13,7 @@ from ray.tune.integration.keras import TuneReportCallback
 from ray.air import session
 import os
 import multiprocessing
-from refer.module.func import debug_message, save_model_with_versioning, load_latest_model, trial_dirname_creator
-from datetime import datetime
+from refer.module.func import debug_message, save_model_with_versioning, trial_dirname_creator
 import random
 
 # 시스템 정보 가져오기
@@ -26,58 +25,58 @@ ray.init(ignore_reinit_error=True)
 
 # 데이터 로드 및 전처리 (DB에서 데이터 가져오기로 수정필요)
 file_path = './refer/output/'
-debug_message("작업 데이터 로드 중...")
-importance_data = pd.read_csv(f'{file_path}importance_data.csv')
-urgency_data = pd.read_csv(f'{file_path}urgency_data.csv')
-achievement_data = pd.read_csv(f'{file_path}achievement_data.csv')
-daily_time_data = pd.read_csv(f'{file_path}daily_time_data.csv')
-debug_message("작업 데이터 로드 완료")
+debug_message("작업 중요도 데이터 로드 중...")
+data = pd.read_csv(f'{file_path}user_info.csv')
+debug_message("작업 중요도 데이터 로드 완료")
 
-# 입력 데이터 준비
-importance_scores = importance_data['importance'].values
-urgency_scores = urgency_data['urgency'].values
-achievement_ratios = achievement_data['achievement_ratio'].values
+# 목표 변수 (중요도) 데이터 로드
+debug_message("작업 중요도 목표 변수 로드 중...")
+target_data = pd.read_csv(f'{file_path}user_weight.csv')
+debug_message("작업 중요도 목표 변수 로드 완료")
 
-# 오늘 날짜의 daily_time 설정
-today_date = datetime.today().strftime('%Y-%m-%d')
-daily_time_row = daily_time_data[daily_time_data['date'] == today_date]
+# 범주형 데이터에 대한 원-핫 인코딩
+debug_message("범주형 데이터 원-핫 인코딩 중...")
+encoder = OneHotEncoder()
+encoded_data = encoder.fit_transform(data[['gender', 'job', 'mbti']]).toarray()
+debug_message("범주형 데이터 원-핫 인코딩 완료")
 
-if not daily_time_row.empty:
-    daily_time = daily_time_row['daily_time'].values[0]
-else:
-    raise ValueError(f"No daily time data available for today ({today_date})")
-
-X = np.vstack((importance_scores, urgency_scores, achievement_ratios)).T
-y = daily_time_data['time_distribution'].values
+# 인코딩된 데이터와 수치형 데이터를 결합
+numeric_data = data[['age']].values  # 나이 데이터는 별도로 결합
+X = np.hstack((encoded_data, numeric_data))
 
 # 데이터 정규화
 debug_message("데이터 정규화 중...")
-scaler_X = StandardScaler()
-X = scaler_X.fit_transform(X)
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-
-# 조건에 따라 y 값 정규화
-normalize_y = True
-if normalize_y:
-    scaler_y = StandardScaler()
-    y_train = scaler_y.fit_transform(y_train.reshape(-1, 1)).flatten()
-    y_test = scaler_y.transform(y_test.reshape(-1, 1)).flatten()
-
+scaler = StandardScaler()  # RobustScaler를 사용할 수도 있음
+X = scaler.fit_transform(X)
 debug_message("데이터 정규화 완료")
 
-# 시간 분배 모델 생성 함수
-def create_time_distribution_model(config):
+# 목표 변수 정의 (중요도)
+y = target_data[['work', 'edu', 'free_time', 'health', 'chores', 'category_else']].values
+
+# 데이터를 학습용과 테스트용으로 분할
+debug_message("데이터 학습용 및 테스트용 분할 중...")
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+debug_message("데이터 학습용 및 테스트용 분할 완료")
+print(len(X_train))
+print(len(X_test))
+print(len(y_train))
+print(len(y_test))
+
+# 모델 생성 함수
+def create_model(config):
     debug_message("모델 생성 중...")
     model = Sequential()
-    model.add(Dense(config["hidden_layer1_size"], input_dim=X_train.shape[1], activation='relu'))
+    model.add(Dense(config["hidden_layer1_size"], input_dim=X_train.shape[1], activation='relu', 
+                    kernel_regularizer=tf.keras.regularizers.l1_l2(l1=config["l1_lambda"], l2=config["l2_lambda"])))
     if config["batch_norm"]:
         model.add(BatchNormalization())
     model.add(Dropout(config["dropout_rate"]))
-    model.add(Dense(config["hidden_layer2_size"], activation='relu'))
+    model.add(Dense(config["hidden_layer2_size"], activation='relu',
+                    kernel_regularizer=tf.keras.regularizers.l1_l2(l1=config["l1_lambda"], l2=config["l2_lambda"])))
     if config["batch_norm"]:
         model.add(BatchNormalization())
     model.add(Dropout(config["dropout_rate"]))
-    model.add(Dense(1, activation='linear'))  # 최종 출력층은 선형 활성화 함수를 사용하여 실수 값을 출력
+    model.add(Dense(y_train.shape[1]))
 
     optimizer_name = config["optimizer"]
     if optimizer_name == "adam":
@@ -89,7 +88,7 @@ def create_time_distribution_model(config):
     else:
         raise ValueError(f"Unsupported optimizer: {optimizer_name}")
 
-    model.compile(optimizer=optimizer, loss='mse', metrics=['mse'])
+    model.compile(optimizer=optimizer, loss='mse', metrics=['mse'])  # MSE를 메트릭으로 추가
     debug_message("모델 생성 완료")
     return model
 
@@ -98,7 +97,7 @@ def train_model(config, X_train, y_train, X_test, y_test):
     print("train_model 함수에서 config는 ", config)
     try:
         debug_message("모델 학습 시작...")
-        model = create_time_distribution_model(config)
+        model = create_model(config)
         log_dir = os.path.join("logs", f"trial_{tune.get_trial_id()[:8]}")
         os.makedirs(log_dir, exist_ok=True)  # 로그 디렉토리가 없으면 생성
         tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=log_dir, histogram_freq=1)
@@ -165,7 +164,7 @@ def tune_model():
         scheduler=scheduler,  # 스케줄러 설정
         verbose=1,  # 학습 과정 출력 레벨: 0은 출력 없음, 1은 진행 상태 막대 표시, 2는 자세한 로그 출력
         trial_dirname_creator=trial_dirname_creator,  # 디렉토리 이름 생성 함수
-        metric= "mean_squared_error",
+        metric='mean_squared_error',
         mode='min'
     )
     debug_message("Ray Tune 하이퍼파라미터 최적화 완료")
@@ -181,14 +180,14 @@ if __name__ == "__main__":
     debug_message("최적의 하이퍼파라미터 찾기 완료")
     
     debug_message("최적의 하이퍼파라미터로 모델 재학습 중...")
-    best_model = create_time_distribution_model(best_config)
+    best_model = create_model(best_config)
     best_model.fit(X_train, y_train, epochs=best_config['epochs'], batch_size=best_config['batch_size'], validation_split=0.2, verbose=1)
     debug_message("모델 재학습 완료")
     
     # 최종 평가 결과
     debug_message("최종 평가 결과 분석 중...")
     best_trial = analysis.get_best_trial("mean_squared_error", mode="min", scope="all")
-    best_trained_model = create_time_distribution_model(best_trial.config)
+    best_trained_model = create_model(best_trial.config)
     best_checkpoint_dir = analysis.get_best_checkpoint(best_trial)
 
     if best_checkpoint_dir:

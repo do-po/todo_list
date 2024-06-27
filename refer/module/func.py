@@ -156,3 +156,8 @@ def load_latest_model(file_path, base_filename):
     if version == 1:
         raise FileNotFoundError(f"No model found for {base_filename}")
     return load_model(os.path.join(file_path, filename))
+
+# 디렉토리 이름 생성 함수
+def trial_dirname_creator(trial):
+    trial_id = trial.trial_id if trial.trial_id else "default_trial"
+    return f"trial_{trial_id}"

@@ -5,21 +5,10 @@ from tensorflow.keras.models import load_model
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 import os
 from datetime import datetime
+from refer.module.func import debug_message, load_latest_model
 
-# 디버깅 메시지 출력 함수
-def debug_message(message):
-    print(f"[디버깅] {message}")
 
-# 모델 로드 함수
-def load_latest_model(file_path, base_filename):
-    version = 1
-    filename = f"{base_filename}_v{version}.h5"
-    while os.path.exists(os.path.join(file_path, filename)):
-        version += 1
-        filename = f"{base_filename}_v{version}.h5"
-    if version == 1:
-        raise FileNotFoundError(f"No model found for {base_filename}")
-    return load_model(os.path.join(file_path, filename))
+
 
 # 데이터 로드
 file_path = './refer/output/'

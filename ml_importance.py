@@ -3,18 +3,18 @@ import joblib
 from sklearn.compose import ColumnTransformer
 from sklearn.preprocessing import OneHotEncoder
 from refer.module.database import MyDB
-from refer.module.func import load_data, save_data
+from refer.module.func import get_data, save_data
 
 # 파일 경로 설정
 file_path = './refer/output/'
 
 # 새로운 데이터를 예측하고 결과를 데이터베이스에 저장하는 함수
-def lgbm(_user_id, model_filename='initial_lightgbm_models_v6.pkl', table_name='learning'):
+def lgbm(_user_id, model_filename='initial_lightgbm_models_v6.pkl', table_name='ml'):
     # 모델 로드
     models = joblib.load(f'{file_path}{model_filename}')
     
     # user_info 테이블에서 데이터 로드
-    user_info = load_data('user_info')
+    user_info = get_data('user_info')
     
     # user_id에 해당하는 데이터 선택
     new_data = user_info[user_info['user_id'] == _user_id]

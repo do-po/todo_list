@@ -1,6 +1,7 @@
 import pandas as pd
 from refer.module.database import MyDB
 from dotenv import load_dotenv
+from tensorflow.keras.models import load_model
 import os
 
 # MyDB 클래스 생성
@@ -129,3 +130,29 @@ def format_result(result):
     for key in first_result.keys():
         data[key] = first_result[key]
     return data  # 형식
+
+
+# 디버깅 메시지 출력 함수
+def debug_message(message):
+    print(f"[디버깅] {message}")
+
+# 모델 버져닝 함수
+def save_model_with_versioning(model, file_path, base_filename):
+    version = 1
+    filename = f"{base_filename}_v{version}.h5"
+    while os.path.exists(os.path.join(file_path, filename)):
+        version += 1
+        filename = f"{base_filename}_v{version}.h5"
+    model.save(os.path.join(file_path, filename))
+    return filename
+
+# 모델 로드 함수
+def load_latest_model(file_path, base_filename):
+    version = 1
+    filename = f"{base_filename}_v{version}.h5"
+    while os.path.exists(os.path.join(file_path, filename)):
+        version += 1
+        filename = f"{base_filename}_v{version}.h5"
+    if version == 1:
+        raise FileNotFoundError(f"No model found for {base_filename}")
+    return load_model(os.path.join(file_path, filename))

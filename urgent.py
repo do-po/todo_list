@@ -7,20 +7,8 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import mean_squared_error
 import os
+from refer.module.func import debug_message, save_model_with_versioning
 
-# 디버깅 메시지 출력 함수
-def debug_message(message):
-    print(f"[디버깅] {message}")
-
-# 모델 저장 함수
-def save_model_with_versioning(model, file_path, base_filename):
-    version = 1
-    filename = f"{base_filename}_v{version}.h5"
-    while os.path.exists(os.path.join(file_path, filename)):
-        version += 1
-        filename = f"{base_filename}_v{version}.h5"
-    model.save(os.path.join(file_path, filename))
-    return filename
 
 # 데이터 로드 및 전처리
 file_path = './refer/output/'

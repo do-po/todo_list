@@ -9,7 +9,7 @@ from refer.module.func import get_data, save_data
 file_path = './refer/output/'
 
 # 새로운 데이터를 예측하고 결과를 데이터베이스에 저장하는 함수
-def lgbm(_user_id, model_filename='initial_lightgbm_models_v6.pkl', table_name='ml'):
+def lgbm(_user_id, model_filename='initial_lightgbm_models_v7.pkl', table_name='ml'):
     # 모델 로드
     models = joblib.load(f'{file_path}{model_filename}')
     

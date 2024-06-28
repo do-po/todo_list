@@ -25,21 +25,21 @@ ray.init(ignore_reinit_error=True)
 # 데이터 로드 및 전처리 (DB에서 데이터 가져오기로 수정필요)
 file_path = './refer/output/'
 debug_message("작업 긴급도 데이터 로드 중...")
-data = pd.read_csv(f'{file_path}data.csv')
+data = pd.read_csv(f'{file_path}user_time.csv')
 debug_message("작업 긴급도 데이터 로드 완료")
 
 # 초기 긴급도 기준 생성 (여기 컬럼명 변경 필요)
 debug_message("긴급도 관련 데이터 생성 중...")
-data['start_date'] = pd.to_datetime(data['start_date'])
-data['end_date'] = pd.to_datetime(data['end_date'])
-data['days_left'] = (data['end_date'] - data['start_date']).dt.days
+data['goal_start_time'] = pd.to_datetime(data['goal_start_time'])
+data['goal_end_time'] = pd.to_datetime(data['goal_end_time'])
+data['days_left'] = (data['goal_end_time'] - data['goal_start_time']).dt.days
 data['urgency'] = 1 / (data['days_left'] + 1)  # 마감일이 가까울수록 긴급도가 높아짐
 debug_message("긴급도 관련 데이터 생성 완료")
 
 # 긴급도 모델을 위한 입력 데이터 준비 (컬럼명 변경 필요)
-X_urgency = data[['start_date', 'end_date', 'complexity']].copy()
-X_urgency['start_date'] = (X_urgency['start_date'] - X_urgency['start_date'].min()).dt.days
-X_urgency['end_date'] = (X_urgency['end_date'] - X_urgency['end_date'].min()).dt.days
+X_urgency = data[['goal_start_time', 'goal_end_time', 'goal_complexity']].copy()
+X_urgency['goal_start_time'] = (X_urgency['goal_start_time'] - X_urgency['goal_start_time'].min()).dt.days
+X_urgency['goal_end_time'] = (X_urgency['goal_end_time'] - X_urgency['goal_end_time'].min()).dt.days
 y_urgency = data['urgency'].values
 
 # 데이터 정규화
@@ -124,18 +124,18 @@ def train_urgency_model(config, X_train_urgency, y_train_urgency, X_test_urgency
 # Ray Tune을 사용한 하이퍼파라미터 최적화
 def tune_urgency_model():
     config = {
-        'lr': tune.choice([0.0001, 0.01]),  # 학습률 결정: 학습 과정에서 가중치가 조정되는 속도
-        'batch_size': tune.choice([16, 64]),  # 배치 크기: 한 번의 훈련 반복에서 사용되는 샘플의 수
-        'epochs': tune.choice([10, 20]),  # 에포크 수: 전체 데이터셋을 훈련하는 반복 횟수
-        'hidden_layer1_size': tune.choice([64, 256]),  # 첫 번째 은닉층의 노드 수 결정: 모델의 복잡성 조절
-        'hidden_layer2_size': tune.choice([32, 128]),  # 두 번째 은닉층의 노드 수 결정: 모델의 복잡성 조절
-        'dropout_rate': tune.choice([0.1, 0.3]),  # 드롭아웃 비율: 과적합을 방지하기 위해 일부 뉴런을 무작위로 제외
+        'lr': tune.choice([0.0001, 0.001, 0.01]),  # 학습률 결정: 학습 과정에서 가중치가 조정되는 속도
+        'batch_size': tune.choice([16, 32, 64]),  # 배치 크기: 한 번의 훈련 반복에서 사용되는 샘플의 수
+        'epochs': tune.choice([100, 200, 300]),  # 에포크 수: 전체 데이터셋을 훈련하는 반복 횟수
+        'hidden_layer1_size': tune.choice([64, 128, 256]),  # 첫 번째 은닉층의 노드 수 결정: 모델의 복잡성 조절
+        'hidden_layer2_size': tune.choice([32, 64, 128]),  # 두 번째 은닉층의 노드 수 결정: 모델의 복잡성 조절
+        'dropout_rate': tune.choice([0.1, 0.2, 0.3]),  # 드롭아웃 비율: 과적합을 방지하기 위해 일부 뉴런을 무작위로 제외
         'batch_norm': tune.choice([True, False]),  # 배치 정규화 사용 여부: 학습을 안정화하고 가속화
         'optimizer': tune.choice(['adam', 'sgd', 'rmsprop']),  # 옵티마이저: 학습 과정에서 가중치를 업데이트하는 방법 결정
-        'l2_lambda': tune.choice([0.0001, 0.01]),  # L2 정규화: 가중치의 크기를 제한하여 과적합 방지
-        'l1_lambda': tune.choice([0.0001, 0.01]),  # L1 정규화: 가중치의 크기를 제한하여 과적합 방지
-        'num_cpus': 4,  # CPU 수 설정
-        'num_gpus': 0   # GPU 수 설정
+        'l2_lambda': tune.choice([0.0001, 0.001, 0.01]),  # L2 정규화: 가중치의 크기를 제한하여 과적합 방지
+        'l1_lambda': tune.choice([0.0001, 0.001, 0.01]),  # L1 정규화: 가중치의 크기를 제한하여 과적합 방지
+        'num_cpus': num_cpus,  # CPU 수 설정
+        'num_gpus': num_gpus   # GPU 수 설정
     }
     # config에서 최대 에포크 값 추출
     max_epochs = max(config['epochs'].categories)
@@ -153,7 +153,7 @@ def tune_urgency_model():
         tune.with_parameters(train_urgency_model, X_train_urgency=X_train_urgency, y_train_urgency=y_train_urgency, X_test_urgency=X_test_urgency, y_test_urgency=y_test_urgency),  # 학습 함수
         resources_per_trial={"cpu": config['num_cpus'], "gpu": config['num_gpus']},  # 각 시도에서 사용할 리소스 설정
         config=config,  # 하이퍼파라미터 설정
-        num_samples=1,  # 샘플링 횟수: 각 설정으로 몇 번의 실험을 실행할지
+        num_samples=10,  # 샘플링 횟수: 각 설정으로 몇 번의 실험을 실행할지
         scheduler=scheduler,  # 스케줄러 설정
         verbose=1,  # 학습 과정 출력 레벨: 0은 출력 없음, 1은 진행 상태 막대 표시, 2는 자세한 로그 출력
         trial_dirname_creator=trial_dirname_creator,  # 디렉토리 이름 생성 함수
